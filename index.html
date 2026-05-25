@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BusCo — Admin Dashboard</title>
+  <link rel="stylesheet" href="css/main.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+</head>
+<body>
+
+  <!-- ═══════════════════════════════════════
+       LOGIN PAGE
+  ═══════════════════════════════════════ -->
+  <div id="loginPage">
+    <div class="login-wrap">
+
+      <!-- Left: Branding -->
+      <div class="login-brand">
+        <div class="login-brand-top">
+          <div class="brand-icon">🚌</div>
+          <div class="brand-name">BusCo</div>
+          <div class="brand-tagline">Transport Management System</div>
+
+          <div class="brand-stats">
+            <div class="brand-stat">
+              <div class="brand-stat-icon">⊙</div>
+              Users, Cards &amp; Wallets
+            </div>
+            <div class="brand-stat">
+              <div class="brand-stat-icon">▷</div>
+              Fleet &amp; Driver Management
+            </div>
+            <div class="brand-stat">
+              <div class="brand-stat-icon">⇄</div>
+              Finance &amp; Transactions
+            </div>
+            <div class="brand-stat">
+              <div class="brand-stat-icon">△</div>
+              Incidents &amp; System Logs
+            </div>
+          </div>
+        </div>
+        <div class="login-brand-footer">VERSION 2.5.0 · ADMIN PORTAL</div>
+      </div>
+
+      <!-- Right: Form -->
+      <div class="login-form-panel">
+        <div class="login-heading">Welcome back</div>
+        <div class="login-subheading">Sign in to manage the network</div>
+
+        <div class="login-error" id="loginError"></div>
+
+        <form id="loginForm" novalidate>
+          <div class="login-fields">
+            <div class="lf-group">
+              <label class="lf-label" for="loginEmail">Email Address</label>
+              <input class="lf-input" id="loginEmail" type="email"
+                     placeholder="admin@busco.eg" autocomplete="email">
+            </div>
+            <div class="lf-group">
+              <label class="lf-label" for="loginPass">Password</label>
+              <input class="lf-input" id="loginPassword" type="password"
+                     placeholder="••••••••" autocomplete="current-password">
+            </div>
+          </div>
+
+          <button class="btn-login" id="loginBtn" type="submit">
+            Sign In <span class="btn-arrow">→</span>
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ═══════════════════════════════════════
+       APP SHELL
+  ═══════════════════════════════════════ -->
+  <div id="appShell">
+
+    <!-- Topbar -->
+    <header class="topbar">
+      <a class="topbar-logo" href="#dashboard">
+        <div class="topbar-logo-icon">🚌</div>
+        <span class="topbar-logo-text">BusCo</span>
+      </a>
+      <div class="topbar-sep"></div>
+      <span class="topbar-breadcrumb" id="breadcrumb">Dashboard</span>
+      <div class="topbar-right">
+        <span class="topbar-session">Signed in as <b id="sessionName">Admin</b> <span id="sessionRole" class="session-role-badge"></span></span>
+        <button class="btn-logout" id="logoutBtn">Sign Out</button>
+      </div>
+    </header>
+
+    <!-- Body -->
+    <div class="app-body">
+
+      <!-- Sidebar -->
+      <nav class="sidebar">
+        <div id="sidebarNav"></div>
+        <div class="sidebar-footer">
+          <strong>Connected</strong>
+          kcdpfvatrwskpdghkxaz<br>.supabase.co
+        </div>
+      </nav>
+
+      <!-- Main -->
+      <main class="main" id="main">
+        <!-- Controllers render here -->
+      </main>
+    </div>
+  </div>
+
+
+  <!-- ═══════════════════════════════════════
+       MODAL
+  ═══════════════════════════════════════ -->
+  <div class="modal-overlay" id="modalOverlay" onclick="if(event.target===this)closeModal()">
+    <div class="modal-box" id="modal">
+      <div class="modal-head">
+        <span class="modal-title-text" id="modalTitle"></span>
+        <button class="modal-close" onclick="closeModal()">✕</button>
+      </div>
+      <div class="modal-body" id="modalBody"></div>
+      <div class="modal-footer" id="modalFooter"></div>
+    </div>
+  </div>
+
+
+  <!-- ═══════════════════════════════════════
+       CONFIRM DIALOG
+  ═══════════════════════════════════════ -->
+  <div class="confirm-overlay" id="confirmOverlay">
+    <div class="confirm-box">
+      <div class="confirm-icon">⚠</div>
+      <div class="confirm-title" id="confirmTitle">Confirm Action</div>
+      <div class="confirm-msg"   id="confirmMessage">Are you sure?</div>
+      <div class="confirm-btns">
+        <button class="btn btn-ghost"  onclick="closeConfirm()">Cancel</button>
+        <button class="btn btn-danger" id="confirmOk">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ═══════════════════════════════════════
+       TOASTS
+  ═══════════════════════════════════════ -->
+  <div class="toast-container" id="toastContainer"></div>
+
+
+  <!-- ═══════════════════════════════════════
+       GLOBAL BRIDGE (for inline onclick)
+  ═══════════════════════════════════════ -->
+  <script type="module">
+    import { closeModal, closeConfirm } from "./js/utils/dom.js";
+    import { initAuth }                 from "./js/auth.js";
+
+    // Expose to global scope for inline handlers
+    window.closeModal   = closeModal;
+    window.closeConfirm = closeConfirm;
+    window.filterTable  = (q) => {
+      const rows = document.querySelectorAll("#tableBody tr");
+      rows.forEach(r => r.style.display = r.textContent.toLowerCase().includes(q.toLowerCase()) ? "" : "none");
+    };
+
+    // Boot
+    initAuth();
+  </script>
+
+</body>
+</html>
