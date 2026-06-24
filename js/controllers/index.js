@@ -10,6 +10,18 @@ import {
   gv, fmtDate, fmtId, fmtMoney, badge, emptyRow, formField,
 } from "../utils/dom.js";
 
+ //Hashing 
+  async function sha256(str) {
+  const buf = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(str)
+  );
+
+  return Array.from(new Uint8Array(buf))
+    .map(b => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
 // ── Shared action buttons ──────────────────────────────────────
 const actTd = id => `<td class="action-td">
   <button class="icon-btn edit-btn"   data-id="${id}" title="Edit">✎</button>
@@ -62,6 +74,8 @@ export async function dashboardController() {
       </div>
     </div>
   </div>`;
+
+ 
 
   // Live clock
   const dashTime = ge("dashTime");
@@ -576,7 +590,7 @@ export const adminsController = makePage({
   createFormFn: () => `
     ${formField({id:"f0",label:"Full Name",placeholder:"Admin Name",required:true})}
     ${formField({id:"f1",label:"Email",type:"email",placeholder:"admin@busco.eg",required:true})}
-    ${formField({id:"f2",label:"Password Hash",placeholder:"hashed_password"})}
+    ${formField({id:"f2",label:"Password",type:"password",required:true})}
     ${formField({id:"f3",label:"Role",options:ROLES,value:"BUS_ADMIN"})}
     ${formField({id:"f4",label:"Station ID",type:"number",placeholder:"(optional)"})}`,
   editFormFn: a => `
@@ -584,7 +598,17 @@ export const adminsController = makePage({
     ${formField({id:"f1",label:"Email",type:"email",value:a.email})}
     ${formField({id:"f3",label:"Role",options:ROLES,value:a.role})}
     ${formField({id:"f4",label:"Station ID",type:"number",value:a.id_station??''})}`,
-  createFn: () => models.admin.create({name:gv("f0"),email:gv("f1"),password_hash:gv("f2")||"placeholder",role:gv("f3"),id_station:parseInt(gv("f4"))||null}),
+ createFn: async () => {
+  const password = gv("f2");
+
+  return models.admin.create({
+    name: gv("f0"),
+    email: gv("f1"),
+    password_hash: await sha256(password),
+    role: gv("f3"),
+    id_station: parseInt(gv("f4")) || null
+  });
+},
   updateFn: id => models.admin.update(id,{name:gv("f0"),email:gv("f1"),role:gv("f3"),id_station:parseInt(gv("f4"))||null}),
   deleteLabel: a => a?.name ?? `Admin #${a?.admin_id}`,
 });
