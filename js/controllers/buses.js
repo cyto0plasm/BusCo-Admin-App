@@ -4,12 +4,6 @@
  * Replaces the makePage() buses entry in controllers/index.js.
  * Edit / create forms use dropdowns for route and driver
  * instead of raw ID text inputs.
- *
- * Drop-in replacement:
- *   1. Add to controllers/index.js:
- *        import { busesController } from "./buses.js";
- *   2. Remove (or comment out) the makePage busesController export
- *      and the BUS_STATUS const at the bottom of index.js.
  */
 
 import { models }  from "../models/index.js";
@@ -36,26 +30,51 @@ export async function busesController() {
   if (!guardRoute("buses")) return;
 
   // ── Fetch reference data for dropdowns ───────────────────────
-  let routes = [], drivers = [];
+  let routes = [], drivers = [], busesForStatusCheck = [];
   try {
-    [routes, drivers] = await Promise.all([
+    [routes, drivers, busesForStatusCheck] = await Promise.all([
       models.route.list({ select: "route_id,name,number_line" }),
       models.driver.list({ select: "driver_id,name" }),
+      models.bus.list({ select: "bus_id,id_driver,number_bus" }) // Added to find occupied drivers
     ]);
     routes  = routes  || [];
     drivers = drivers || [];
+    busesForStatusCheck = busesForStatusCheck || [];
   } catch (e) {
     toast("Could not load reference data: " + e.message, "error");
   }
+
+  // Create a quick lookup map of who is driving what right now
+  const occupiedDriversMap = new Map();
+  busesForStatusCheck.forEach(b => {
+    if (b.id_driver) {
+      occupiedDriversMap.set(String(b.id_driver), b.number_bus);
+    }
+  });
 
   const routeOpts = [
     { value: "", label: "— No route —" },
     ...routes.map(r => ({ value: String(r.route_id), label: `${r.number_line} · ${r.name}` })),
   ];
-  const driverOpts = [
-    { value: "", label: "— Unassigned —" },
-    ...drivers.map(d => ({ value: String(d.driver_id), label: `#${d.driver_id} · ${d.name}` })),
-  ];
+
+  // Dynamic helper to build driver lists while keeping current assignment valid
+  const getDriverOptsForBus = (currentBusDriverId = null) => {
+    return [
+      { value: "", label: "— Unassigned —" },
+      ...drivers.map(d => {
+        const driverIdStr = String(d.driver_id);
+        const assignedBusNum = occupiedDriversMap.get(driverIdStr);
+        
+        let label = `#${d.driver_id} · ${d.name}`;
+        // If driver is busy elsewhere, flag them. If they are on THIS bus, leave them clean.
+        if (assignedBusNum && driverIdStr !== String(currentBusDriverId ?? "")) {
+          label += ` [Busy: ${assignedBusNum}]`;
+        }
+
+        return { value: driverIdStr, label };
+      }),
+    ];
+  };
 
   // Helper: find label for a given id in an options array
   const findLabel = (opts, id) => opts.find(o => String(o.value) === String(id ?? ""))?.label ?? `#${id}`;
@@ -74,7 +93,7 @@ export async function busesController() {
         ? `<span class="badge badge-blue">${findLabel(routeOpts, b.route_id)}</span>`
         : '<span class="nil">—</span>'}</td>
       <td>${b.id_driver
-        ? `<span class="badge badge-slate">${findLabel(driverOpts, b.id_driver)}</span>`
+        ? `<span class="badge badge-slate">${findLabel(getDriverOptsForBus(b.id_driver), b.id_driver)}</span>`
         : '<span class="nil">Unassigned</span>'}</td>
       <td>${badge(b.status)}</td>
       <td><span class="badge badge-slate">${b.count_today_trips ?? 0}</span></td>
@@ -84,11 +103,13 @@ export async function busesController() {
       ${actTd(b.bus_id)}
     </tr>`,
 
-    createFormHTML: () => `
+ createFormHTML: () => `
       ${formField({ id: "bf0", label: "Bus Number", placeholder: "BUS-003", required: true })}
       ${formField({ id: "bf1", label: "Status",  options: BUS_STATUS_OPTS, value: "IDLE" })}
-      ${formField({ id: "bf2", label: "Route",   options: routeOpts,       value: "" })}
-      ${formField({ id: "bf3", label: "Driver",  options: driverOpts,      value: "" })}`,
+      <div class="form-group full">
+        ${formField({ id: "bf3", label: "Driver",  options: getDriverOptsForBus(null), value: "" })}
+      </div>
+      ${formField({ id: "bf2", label: "Route",   options: routeOpts,       value: "" })}`,
 
     onCreateSubmit: () => models.bus.create({
       number_bus:        gv("bf0"),
@@ -98,13 +119,15 @@ export async function busesController() {
       count_today_trips: 0,
     }),
 
-    editFormHTML: b => `
+ editFormHTML: b => `
       ${formField({ id: "bf0", label: "Bus Number", value: b.number_bus, required: true })}
       ${formField({ id: "bf1", label: "Status",  options: BUS_STATUS_OPTS, value: b.status })}
+      <div class="form-group full">
+        ${formField({ id: "bf3", label: "Driver",  options: getDriverOptsForBus(b.id_driver), value: String(b.id_driver ?? "") })}
+      </div>
       ${formField({ id: "bf2", label: "Route",   options: routeOpts,       value: String(b.route_id ?? "") })}
-      ${formField({ id: "bf3", label: "Driver",  options: driverOpts,      value: String(b.id_driver ?? "") })}
       ${formField({ id: "bf4", label: "Today Trips", type: "number", value: b.count_today_trips ?? 0 })}`,
-
+      
     onEditSubmit: id => models.bus.update(id, {
       number_bus:        gv("bf0"),
       status:            gv("bf1"),

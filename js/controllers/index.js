@@ -316,32 +316,101 @@ export function walletsController() {
 //  DRIVERS
 // ═══════════════════════════════════════════════════════════════
 export const driversController = makePage({
-  title:"Drivers", subtitle:"Bus drivers and their assignments",
-  model:models.driver, addLabel:"Add Driver",
-  cols:["ID","Name","Phone","Email","Bus","Daily Trips",""],
+  title: "Drivers", 
+  subtitle: "Bus drivers and their shifts",
+  model: models.driver, 
+  addLabel: "Add Driver",
+  // Added "License No." to the table columns
+  cols: ["ID", "Name", "License No.", "Phone", "Daily Trips", ""],
   rowFn: d => `<tr>
     <td>${fmtId(d.driver_id)}</td>
     <td class="name-cell">${d.name ?? "—"}</td>
+    <!-- Displaying the License Number -->
+    <td class="mono sm">${d.license_no ?? "—"}</td>
     <td class="mono sm">${d.phone ?? "—"}</td>
-    <td class="sm">${d.email ?? "—"}</td>
-    <td>${d.current_bus_id ? `<span class="badge badge-green">Bus #${d.current_bus_id}</span>` : '<span class="nil">Unassigned</span>'}</td>
     <td><span class="badge badge-blue">${d.count_trips_daily ?? 0}</span></td>
     ${actTd(d.driver_id)}
   </tr>`,
   createFormFn: () => `
-    ${formField({id:"f0",label:"Full Name",placeholder:"Hassan Ali",required:true})}
-    ${formField({id:"f1",label:"Phone",placeholder:"01055555551"})}
-    ${formField({id:"f2",label:"Email",type:"email",placeholder:"hassan@driver.eg"})}
-    ${formField({id:"f3",label:"Password Hash",placeholder:"hashed_password"})}
-    ${formField({id:"f4",label:"Assign Bus ID",type:"number",placeholder:"(optional)"})}
-    ${formField({id:"f5",label:"Device ID",placeholder:"DEV-TAB-001"})}`,
-  editFormFn: d => `
-    ${formField({id:"f0",label:"Full Name",value:d.name,required:true})}
-    ${formField({id:"f1",label:"Phone",value:d.phone})}
-    ${formField({id:"f2",label:"Email",type:"email",value:d.email})}
-    ${formField({id:"f4",label:"Assign Bus ID",type:"number",value:d.current_bus_id??''})}`,
-  createFn: () => models.driver.create({name:gv("f0"),phone:gv("f1"),email:gv("f2"),password_hash:gv("f3")||"placeholder",current_bus_id:parseInt(gv("f4"))||null,id_device_driver:gv("f5")||null,count_trips_daily:0}),
-  updateFn: id => models.driver.update(id,{name:gv("f0"),phone:gv("f1"),email:gv("f2"),current_bus_id:parseInt(gv("f4"))||null}),
+    ${formField({id: "f0", label: "Full Name", placeholder: "Hassan Ali", required: true})}
+    ${formField({id: "f1", label: "Phone", placeholder: "01055555551"})}
+    ${formField({id: "f2", label: "Email", type: "email", placeholder: "hassan@driver.eg"})}
+    <!-- Added License No. field. Required for tablet login -->
+    ${formField({id: "f6", label: "License No. (Login ID)", placeholder: "12345678", required: true})}
+    ${formField({id: "f3", label: "Password Hash", placeholder: "hashed_password"})}
+    ${formField({id: "f5", label: "Device ID", placeholder: "DEV-TAB-001"})}`,
+    
+  editFormFn: d => {
+    // Inject an async loader task to populate history right after the HTML renders
+    setTimeout(async () => {
+      const logContainer = document.getElementById("driver-history-log");
+      if (!logContainer) return;
+      try {
+        const allTrips = await models.trip.list();
+        const history = (allTrips || []).filter(t => String(t.driver_id) === String(d.driver_id));
+        
+        if (history.length === 0) {
+          logContainer.innerHTML = `<div class="nil" style="padding: 10px 0;">No shifts recorded for this driver yet.</div>`;
+          return;
+        }
+
+        logContainer.innerHTML = `
+          <table style="width:100%; border-collapse: collapse; font-size: 12px; text-align: left; margin-top: 8px;">
+            <thead>
+              <tr style="border-bottom: 2px solid var(--cream3); color: var(--muted); font-weight: 700;">
+                <th style="padding: 6px 4px;">Trip ID</th>
+                <th style="padding: 6px 4px;">Bus</th>
+                <th style="padding: 6px 4px;">Started At</th>
+                <th style="padding: 6px 4px;">Pass.</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${history.map(t => `
+                <tr style="border-bottom: 1px solid var(--cream2);">
+                  <td style="padding: 6px 4px; color: var(--muted);">${fmtId(t.trip_id)}</td>
+                  <td style="padding: 6px 4px;"><span class="badge badge-green">${t.number_bus ?? `Bus #${t.bus_id}`}</span></td>
+                  <td style="padding: 6px 4px;" class="mono sm">${fmtDate(t.start_time)}</td>
+                  <td style="padding: 6px 4px;"><span class="badge badge-blue">${t.passenger_count ?? 0}</span></td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>`;
+      } catch (e) {
+        logContainer.innerHTML = `<div style="color:var(--danger); font-size:12px;">Error loading logs: ${e.message}</div>`;
+      }
+    }, 50);
+
+    return `
+      ${formField({id: "f0", label: "Full Name", value: d.name, required: true})}
+      ${formField({id: "f1", label: "Phone", value: d.phone})}
+      ${formField({id: "f2", label: "Email", type: "email", value: d.email})}
+      <!-- Added License No. to the edit form -->
+      ${formField({id: "f6", label: "License No. (Login ID)", value: d.license_no, required: true})}
+      
+      <!-- History Logs Section Embedded Seamlessly Inside Modal Layout -->
+      <div class="form-group full" style="margin-top: 16px; border-top: 1px dashed var(--cream3); padding-top: 16px;">
+        <label class="f-label" style="color: var(--muted);">Shift & Bus History Logs</label>
+        <div id="driver-history-log" style="max-height: 200px; overflow-y: auto; padding-right: 4px;">
+          <div class="sm text-muted" style="animation: pulse 1s infinite; padding: 10px 0;">Loading historical logs...</div>
+        </div>
+      </div>`;
+  },
+  
+  createFn: () => models.driver.create({
+    name: gv("f0"), 
+    phone: gv("f1"), 
+    email: gv("f2"), 
+    password_hash: gv("f3") || "placeholder", 
+    id_device_driver: gv("f5") || null, 
+    license_no: gv("f6"), // <--- Saving the license number
+    count_trips_daily: 0
+  }),
+  updateFn: id => models.driver.update(id, {
+    name: gv("f0"), 
+    phone: gv("f1"), 
+    email: gv("f2"),
+    license_no: gv("f6") // <--- Updating the license number
+  }),
   deleteLabel: d => d?.name ?? `Driver #${d?.driver_id}`,
 });
 
