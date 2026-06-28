@@ -203,7 +203,7 @@ export async function analyticsController() {
     const [txns, buses, trips, incidents, wallets, recharges, drivers] = await Promise.all([
       models.transaction.listRecent(300),
       models.bus.list({ select: "bus_id,status,number_bus,count_today_trips" }),
-      models.trip.list({ select: "trip_id,active,km_per_fare,distance_total,driver_id,bus_id" }),
+      models.trip.list({ select: "trip_id,active,fare,distance_total,driver_id,bus_id" }),
       models.incident.list({ select: "incident_id,severity_level" }),
       models.wallet.list({ select: "wallet_id,balance" }),
       models.recharge.listRecent(),
@@ -220,7 +220,8 @@ export async function analyticsController() {
 
     // ── Hero KPIs ──────────────────────────────────────────────
     const totalRev   = tx.filter(t => t.type === "DEBIT").reduce((s, t) => s + parseFloat(t.fare ?? 0), 0);
-    const activeBus  = bus.filter(b => b.status === "ACTIVE").length;
+   const activeBus = bus.filter(b => b.status === "ON_TRIP").length;
+
     const activeTr   = tr.filter(t => t.active).length;
     const walletSum  = wal.reduce((s, w) => s + parseFloat(w.balance ?? 0), 0);
 
@@ -324,14 +325,14 @@ export async function analyticsController() {
 
     // ── 2. Fleet doughnut ─────────────────────────────────────
     {
-      const fc = { ACTIVE: 0, IDLE: 0, BROKEN: 0 };
-      bus.forEach(b => { fc[b.status] = (fc[b.status] || 0) + 1; });
+     const fc = { ON_TRIP: 0, IDLE: 0, BROKEN: 0 };
+bus.forEach(b => { fc[b.status] = (fc[b.status] || 0) + 1; });
 
       mkChart("cFleet", {
         type: "doughnut",
         data: {
-          labels: ["Active", "Idle", "Broken"],
-          datasets: [{ data: [fc.ACTIVE, fc.IDLE, fc.BROKEN],
+          labels: ["On Trip", "Idle", "Broken"],
+datasets: [{ data: [fc.ON_TRIP, fc.IDLE, fc.BROKEN],
             backgroundColor: [a(P.green, 0.85), a(P.blue, 0.75), a(P.red, 0.80)],
             borderColor: "#1A2A3A", borderWidth: 3, hoverOffset: 10 }],
         },
@@ -497,15 +498,16 @@ export async function analyticsController() {
 
     // ── 9. Top 15 trips by fare rate ──────────────────────────
     {
-      const top = tr.filter(t => t.km_per_fare)
-        .sort((a, b) => parseFloat(b.km_per_fare) - parseFloat(a.km_per_fare))
-        .slice(0, 15);
+      const top = tr.filter(t => t.fare)
+.sort((a, b) => parseFloat(b.fare) - parseFloat(a.fare))
+;
 
       mkChart("cTopTrips", {
         type: "bar",
         data: { labels: top.map(t => `#${t.trip_id}`), datasets: [{
           label: "Fare/KM (EGP)",
-          data: top.map(t => parseFloat(t.km_per_fare)),
+          data: top.map(t => parseFloat(t.fare)),
+
           backgroundColor: top.map((_, i) => {
             const r = i / top.length;
             return a(r < 0.33 ? P.dblue : r < 0.66 ? P.blue : P.lblue, 0.82);
@@ -515,7 +517,8 @@ export async function analyticsController() {
         options: {
           responsive: true, maintainAspectRatio: false,
           plugins: { legend: { display: false },
-            tooltip: { callbacks: { label: ctx => ` ${ctx.parsed.y.toFixed(4)} EGP/km` }}
+            tooltip: { callbacks: { label: ctx => ` ${ctx.parsed.y.toFixed(2)} EGP flat fare`
+ }}
           },
           scales: {
             x: scaleX(),

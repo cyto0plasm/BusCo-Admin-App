@@ -36,6 +36,10 @@ export const ROUTE_PERMS = {
   trips:        { read: ["SUPER_ADMIN", "BUS_ADMIN"],                  write: ["SUPER_ADMIN", "BUS_ADMIN"] },
   stations:     { read: ["SUPER_ADMIN", "BUS_ADMIN", "FINANCE_ADMIN"], write: ["SUPER_ADMIN", "BUS_ADMIN"] },
 
+    map:    { read: ["SUPER_ADMIN", "BUS_ADMIN"],            write: ["SUPER_ADMIN", "BUS_ADMIN"] },
+  routes: { read: ["SUPER_ADMIN", "BUS_ADMIN"],            write: ["SUPER_ADMIN", "BUS_ADMIN"] },
+ 
+
   // Finance
   transactions: { read: ["SUPER_ADMIN", "FINANCE_ADMIN"],              write: [] },  // immutable ledger
   recharge:     { read: ["SUPER_ADMIN", "FINANCE_ADMIN"],              write: [] },  // immutable ledger

@@ -127,6 +127,33 @@ export class LogModel extends BaseModel {
   }
 }
 
+export class RouteModel extends BaseModel {
+  constructor() { super("routes", "route_id"); }
+
+  listWithStopCount() {
+    return api.get("routes", {
+      select: "route_id,name,number_line,fare,route_stops(count)",
+      order: "route_id.asc",
+    });
+  }
+}
+
+export class RouteStopModel extends BaseModel {
+  constructor() { super("route_stops", "id"); }
+
+  listByRoute(routeId) {
+    return api.list("route_stops", {
+      route_id: `eq.${routeId}`,
+      select: "id,route_id,station_id,stop_order,estimated_minutes,stations(name,location_lat,location_lng)",
+      order: "stop_order.asc",
+    });
+  }
+
+  reorder(id, newOrder) {
+    return this.update(id, { stop_order: newOrder });
+  }
+}
+
 // ── Singleton exports ──────────────────────────────────────────
 export const models = {
   admin:       new AdminModel(),
@@ -137,6 +164,8 @@ export const models = {
   bus:         new BusModel(),
   trip:        new TripModel(),
   station:     new StationModel(),
+  route:       new RouteModel(),       
+  routeStop:   new RouteStopModel(),
   transaction: new TransactionModel(),
   recharge:    new RechargeModel(),
   transfer:    new TransferModel(),

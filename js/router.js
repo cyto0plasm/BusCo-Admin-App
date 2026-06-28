@@ -15,9 +15,8 @@ import {
   cardsController,
   walletsController,
   driversController,
-  busesController,
+  
   tripsController,
-  stationsController,
   transactionsController,
   rechargeController,
   transfersController,
@@ -27,6 +26,11 @@ import {
 } from "./controllers/index.js";
 import { analyticsController } from "./controllers/analytics.js";
 import { profileController }   from "./controllers/profile.js";
+import { mapController    } from "./controllers/map.js";
+import { routesController } from "./controllers/routes.js";
+import { busesController  } from "./controllers/buses.js";   
+ import { stationsController } from "./controllers/stations.js";
+
 
 const CONTROLLERS = {
   dashboard:    dashboardController,
@@ -37,14 +41,18 @@ const CONTROLLERS = {
   wallets:      walletsController,
   drivers:      driversController,
   buses:        busesController,
-  trips:        tripsController,
+  map:    mapController,
+  routes: routesController,
   stations:     stationsController,
+  trips:        tripsController,
   transactions: transactionsController,
   recharge:     rechargeController,
   transfers:    transfersController,
   incidents:    incidentsController,
   logs:         logsController,
   admins:       adminsController,
+
+  
 };
 
 export function buildSidebar() {
@@ -100,6 +108,7 @@ export function navigate(routeId, pushState = true) {
 
 export function initRouter() {
   buildSidebar();
+   window.navigate = navigate;
 
   ge("sidebarNav").addEventListener("click", e => {
     const btn = e.target.closest(".nav-item[data-route]");

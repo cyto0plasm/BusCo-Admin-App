@@ -39,7 +39,7 @@ export async function dashboardController() {
         <p class="page-sub">Live network overview — <span id="dashTime" class="dash-time"></span></p>
       </div>
       <div class="page-actions">
-        <button class="btn btn-ghost" onclick="window.location.hash='analytics'" style="font-size:12px">
+        <button class="btn btn-ghost" onclick="navigate('analytics')" style="font-size:12px">
           View Full Analytics →
         </button>
       </div>
@@ -348,36 +348,53 @@ export const driversController = makePage({
 // ═══════════════════════════════════════════════════════════════
 //  BUSES
 // ═══════════════════════════════════════════════════════════════
-const BUS_STATUS = [{value:"IDLE",label:"IDLE"},{value:"ACTIVE",label:"ACTIVE"},{value:"BROKEN",label:"BROKEN"}];
+// const BUS_STATUS = [
+//   {value:"IDLE",   label:"IDLE"},
+//   {value:"ACTIVE", label:"ACTIVE"},
+//   {value:"BROKEN", label:"BROKEN"},
+//   {value:"ON_TRIP",label:"ON_TRIP"},
+// ];
+// export const busesController = makePage({
+//   title:"Buses", subtitle:"Fleet — status, GPS, assignments",
+//   model:models.bus, addLabel:"Add Bus",
+//   cols:["ID","Bus No.","Line","Driver","Status","Today","GPS",""],
+//   rowFn: b => `<tr>
+//     <td>${fmtId(b.bus_id)}</td>
+//     <td class="name-cell">${b.number_bus ?? "—"}</td>
+//     <td>${b.id_driver ? fmtId(b.id_driver) : '<span class="nil">—</span>'}</td>
+//     <td>${badge(b.status)}</td>
+//     <td><span class="badge badge-slate">${b.count_today_trips ?? 0}</span></td>
+//     <td class="mono sm">${b.gps_lat ? `${parseFloat(b.gps_lat).toFixed(4)}, ${parseFloat(b.gps_lng).toFixed(4)}` : '<span class="nil">—</span>'}</td>
+//     ${actTd(b.bus_id)}
+//   </tr>`,
+// createFormFn: () => `
+//     ${formField({id:"f0",label:"Bus Number",placeholder:"BUS-003",required:true})}
+//     ${formField({id:"f2",label:"Driver ID",type:"number",placeholder:"(optional)"})}
+//     ${formField({id:"f3",label:"Status",options:BUS_STATUS,value:"IDLE"})}
+//     ${formField({id:"f4",label:"Route ID",type:"number",placeholder:"(optional)"})}`,
+// editFormFn: b => `
+//     ${formField({id:"f0",label:"Bus Number",value:b.number_bus,required:true})}
+//     ${formField({id:"f2",label:"Driver ID",type:"number",value:b.id_driver??''})}
+//     ${formField({id:"f3",label:"Status",options:BUS_STATUS,value:b.status})}
+//     ${formField({id:"f4",label:"Route ID",type:"number",value:b.route_id??''})}
+//     ${formField({id:"f5",label:"Today Trips",type:"number",value:b.count_today_trips??0})}`,
 
-export const busesController = makePage({
-  title:"Buses", subtitle:"Fleet — status, GPS, assignments",
-  model:models.bus, addLabel:"Add Bus",
-  cols:["ID","Bus No.","Line","Driver","Status","Today","GPS",""],
-  rowFn: b => `<tr>
-    <td>${fmtId(b.bus_id)}</td>
-    <td class="name-cell">${b.number_bus ?? "—"}</td>
-    <td><span class="badge badge-slate">${b.number_line ?? "—"}</span></td>
-    <td>${b.id_driver ? fmtId(b.id_driver) : '<span class="nil">—</span>'}</td>
-    <td>${badge(b.status)}</td>
-    <td><span class="badge badge-slate">${b.count_today_trips ?? 0}</span></td>
-    <td class="mono sm">${b.gps_lat ? `${parseFloat(b.gps_lat).toFixed(4)}, ${parseFloat(b.gps_lng).toFixed(4)}` : '<span class="nil">—</span>'}</td>
-    ${actTd(b.bus_id)}
-  </tr>`,
-  createFormFn: () => `
-    ${formField({id:"f0",label:"Bus Number",placeholder:"BUS-003",required:true})}
-    ${formField({id:"f1",label:"Line Number",placeholder:"LINE-7"})}
-    ${formField({id:"f2",label:"Driver ID",type:"number",placeholder:"(optional)"})}
-    ${formField({id:"f3",label:"Status",options:BUS_STATUS,value:"IDLE"})}`,
-  editFormFn: b => `
-    ${formField({id:"f0",label:"Bus Number",value:b.number_bus,required:true})}
-    ${formField({id:"f1",label:"Line Number",value:b.number_line})}
-    ${formField({id:"f2",label:"Driver ID",type:"number",value:b.id_driver??''})}
-    ${formField({id:"f3",label:"Status",options:BUS_STATUS,value:b.status})}`,
-  createFn: () => models.bus.create({number_bus:gv("f0"),number_line:gv("f1"),id_driver:parseInt(gv("f2"))||null,status:gv("f3")||"IDLE",count_today_trips:0}),
-  updateFn: id => models.bus.update(id,{number_bus:gv("f0"),number_line:gv("f1"),id_driver:parseInt(gv("f2"))||null,status:gv("f3")}),
-  deleteLabel: b => b?.number_bus ?? `Bus #${b?.bus_id}`,
-});
+// createFn: () => models.bus.create({
+//     number_bus:        gv("f0"),
+//     id_driver:         parseInt(gv("f2")) || null,
+//     status:            gv("f3") || "IDLE",
+//     route_id:          parseInt(gv("f4")) || null,
+//     count_today_trips: 0,
+// }),
+// updateFn: id => models.bus.update(id, {
+//     number_bus:        gv("f0"),
+//     id_driver:         parseInt(gv("f2")) || null,
+//     status:            gv("f3"),
+//     route_id:          parseInt(gv("f4")) || null,
+//     count_today_trips: parseInt(gv("f5")) || 0,
+// }),
+//   deleteLabel: b => b?.number_bus ?? `Bus #${b?.bus_id}`,
+// });
 
 // ═══════════════════════════════════════════════════════════════
 //  TRIPS
@@ -393,7 +410,7 @@ export const tripsController = makePage({
     <td>${t.bus_id ? `<span class="badge badge-blue">Bus #${t.bus_id}</span>` : '<span class="nil">—</span>'}</td>
     <td>${fmtId(t.driver_id)}</td>
     <td>${t.active ? badge("ACTIVE") : badge("IDLE")}</td>
-    <td class="mono sm">${t.km_per_fare ?? "—"} EGP</td>
+    <td class="mono sm">${t.fare ?? "—"} EGP</td>
     <td class="mono sm">${t.distance_total ? t.distance_total+" km" : '<span class="nil">—</span>'}</td>
     <td class="ts">${fmtDate(t.start_time)}</td>
     <td class="ts">${t.end_time ? fmtDate(t.end_time) : '<span class="badge badge-green">Ongoing</span>'}</td>
@@ -404,45 +421,58 @@ export const tripsController = makePage({
     ${formField({id:"f1",label:"Driver ID",type:"number",placeholder:"1"})}
     ${formField({id:"f2",label:"Fare per KM",type:"number",placeholder:"0.75",value:"0.75"})}
     ${formField({id:"f3",label:"Tablet Device",placeholder:"TABLET-BUS-001"})}`,
-  editFormFn: t => `
+ editFormFn: t => `
     ${formField({id:"f0",label:"Bus ID",type:"number",value:t.bus_id??''})}
     ${formField({id:"f1",label:"Driver ID",type:"number",value:t.driver_id??''})}
-    ${formField({id:"f2",label:"Fare per KM",type:"number",value:t.km_per_fare??0.75})}
+    ${formField({id:"f2",label:"Fare (EGP)",type:"number",value:t.fare??5})}
     ${formField({id:"f3",label:"Distance (km)",type:"number",value:t.distance_total??''})}
     ${formField({id:"f4",label:"Status",options:TRIP_STATUS,value:String(t.active)})}
     ${formField({id:"f5",label:"End Time",type:"datetime-local",value:t.end_time?t.end_time.slice(0,16):''})}`,
-  createFn: () => models.trip.create({bus_id:parseInt(gv("f0")),driver_id:parseInt(gv("f1"))||null,km_per_fare:parseFloat(gv("f2"))||0.75,id_tablet_trip:gv("f3")||null,active:true,list_passengers:[]}),
-  updateFn: id => models.trip.update(id,{bus_id:parseInt(gv("f0"))||null,driver_id:parseInt(gv("f1"))||null,km_per_fare:parseFloat(gv("f2"))||0.75,distance_total:parseFloat(gv("f3"))||null,active:gv("f4")==="true",end_time:gv("f5")||null}),
+
+createFn: () => models.trip.create({
+    bus_id: parseInt(gv("f0")),
+    driver_id: parseInt(gv("f1")) || null,
+    fare: parseFloat(gv("f2")) || 5,
+    id_tablet_trip: gv("f3") || null,
+    active: true,
+}),  updateFn: id => models.trip.update(id, {
+    bus_id: parseInt(gv("f0")) || null,
+    driver_id: parseInt(gv("f1")) || null,
+    fare: parseFloat(gv("f2")) || 5,
+    distance_total: parseFloat(gv("f3")) || null,
+    active: gv("f4") === "true",
+    end_time: gv("f5") || null,
+}),
   deleteLabel: t => `Trip #${t?.trip_id}`,
 });
 
 // ═══════════════════════════════════════════════════════════════
 //  STATIONS
 // ═══════════════════════════════════════════════════════════════
-export const stationsController = makePage({
-  title:"Stations", subtitle:"Bus stops and stations across the network",
-  model:models.station, addLabel:"Add Station",
-  cols:["ID","Name","Latitude","Longitude","Created",""],
-  rowFn: s => `<tr>
-    <td>${fmtId(s.station_id)}</td>
-    <td class="name-cell">${s.name ?? "—"}</td>
-    <td class="mono sm">${s.location_lat ?? "—"}</td>
-    <td class="mono sm">${s.location_lng ?? "—"}</td>
-    <td class="ts">${fmtDate(s.created_at)}</td>
-    ${actTd(s.station_id)}
-  </tr>`,
-  createFormFn: () => `
-    ${formField({id:"f0",label:"Station Name",placeholder:"Tahrir Square",required:true,fullWidth:true})}
-    ${formField({id:"f1",label:"Latitude",type:"number",placeholder:"30.0444196"})}
-    ${formField({id:"f2",label:"Longitude",type:"number",placeholder:"31.2357116"})}`,
-  editFormFn: s => `
-    ${formField({id:"f0",label:"Station Name",value:s.name,required:true,fullWidth:true})}
-    ${formField({id:"f1",label:"Latitude",type:"number",value:s.location_lat??''})}
-    ${formField({id:"f2",label:"Longitude",type:"number",value:s.location_lng??''})}`,
-  createFn: () => models.station.create({name:gv("f0"),location_lat:parseFloat(gv("f1"))||null,location_lng:parseFloat(gv("f2"))||null}),
-  updateFn: id => models.station.update(id,{name:gv("f0"),location_lat:parseFloat(gv("f1"))||null,location_lng:parseFloat(gv("f2"))||null}),
-  deleteLabel: s => s?.name ?? `Station #${s?.station_id}`,
-});
+// export const stationsController = makePage({
+//   title:"Stations", subtitle:"Bus stops and stations across the network",
+//   model:models.station, addLabel:"Add Station",
+//   cols:["ID","Name","Latitude","Longitude","Created",""],
+//   rowFn: s => `<tr>
+//     <td>${fmtId(s.station_id)}</td>
+//     <td class="name-cell">${s.name ?? "—"}</td>
+//     <td class="mono sm">${s.location_lat ?? "—"}</td>
+//     <td class="mono sm">${s.location_lng ?? "—"}</td>
+//     <td class="ts">${fmtDate(s.created_at)}</td>
+//     ${actTd(s.station_id)}
+//   </tr>`,
+//   createFormFn: () => `
+//     ${formField({id:"f0",label:"Station Name",placeholder:"Tahrir Square",required:true,fullWidth:true})}
+//     ${formField({id:"f1",label:"Latitude",type:"number",placeholder:"30.0444196"})}
+//     ${formField({id:"f2",label:"Longitude",type:"number",placeholder:"31.2357116"})}`,
+//   editFormFn: s => `
+//     ${formField({id:"f0",label:"Station Name",value:s.name,required:true,fullWidth:true})}
+//     ${formField({id:"f1",label:"Latitude",type:"number",value:s.location_lat??''})}
+//     ${formField({id:"f2",label:"Longitude",type:"number",value:s.location_lng??''})}`,
+//   createFn: () => models.station.create({name:gv("f0"),location_lat:parseFloat(gv("f1"))||null,location_lng:parseFloat(gv("f2"))||null}),
+//   updateFn: id => models.station.update(id,{name:gv("f0"),location_lat:parseFloat(gv("f1"))||null,location_lng:parseFloat(gv("f2"))||null}),
+//   deleteLabel: s => s?.name ?? `Station #${s?.station_id}`,
+// });
 
 // ═══════════════════════════════════════════════════════════════
 //  TRANSACTIONS (read-only)
