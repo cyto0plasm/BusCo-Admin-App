@@ -316,16 +316,14 @@ export function walletsController() {
 //  DRIVERS
 // ═══════════════════════════════════════════════════════════════
 export const driversController = makePage({
-  title: "Drivers", 
+  title: "Drivers",
   subtitle: "Bus drivers and their shifts",
-  model: models.driver, 
+  model: models.driver,
   addLabel: "Add Driver",
-  // Added "License No." to the table columns
   cols: ["ID", "Name", "License No.", "Phone", "Daily Trips", ""],
   rowFn: d => `<tr>
     <td>${fmtId(d.driver_id)}</td>
     <td class="name-cell">${d.name ?? "—"}</td>
-    <!-- Displaying the License Number -->
     <td class="mono sm">${d.license_no ?? "—"}</td>
     <td class="mono sm">${d.phone ?? "—"}</td>
     <td><span class="badge badge-blue">${d.count_trips_daily ?? 0}</span></td>
@@ -335,20 +333,18 @@ export const driversController = makePage({
     ${formField({id: "f0", label: "Full Name", placeholder: "Hassan Ali", required: true})}
     ${formField({id: "f1", label: "Phone", placeholder: "01055555551"})}
     ${formField({id: "f2", label: "Email", type: "email", placeholder: "hassan@driver.eg"})}
-    <!-- Added License No. field. Required for tablet login -->
     ${formField({id: "f6", label: "License No. (Login ID)", placeholder: "12345678", required: true})}
-    ${formField({id: "f3", label: "Password Hash", placeholder: "hashed_password"})}
+    ${formField({id: "f3", label: "Password", type: "password", placeholder: "Enter password", required: true})}
     ${formField({id: "f5", label: "Device ID", placeholder: "DEV-TAB-001"})}`,
-    
+
   editFormFn: d => {
-    // Inject an async loader task to populate history right after the HTML renders
     setTimeout(async () => {
       const logContainer = document.getElementById("driver-history-log");
       if (!logContainer) return;
       try {
         const allTrips = await models.trip.list();
         const history = (allTrips || []).filter(t => String(t.driver_id) === String(d.driver_id));
-        
+
         if (history.length === 0) {
           logContainer.innerHTML = `<div class="nil" style="padding: 10px 0;">No shifts recorded for this driver yet.</div>`;
           return;
@@ -384,10 +380,8 @@ export const driversController = makePage({
       ${formField({id: "f0", label: "Full Name", value: d.name, required: true})}
       ${formField({id: "f1", label: "Phone", value: d.phone})}
       ${formField({id: "f2", label: "Email", type: "email", value: d.email})}
-      <!-- Added License No. to the edit form -->
       ${formField({id: "f6", label: "License No. (Login ID)", value: d.license_no, required: true})}
-      
-      <!-- History Logs Section Embedded Seamlessly Inside Modal Layout -->
+
       <div class="form-group full" style="margin-top: 16px; border-top: 1px dashed var(--cream3); padding-top: 16px;">
         <label class="f-label" style="color: var(--muted);">Shift & Bus History Logs</label>
         <div id="driver-history-log" style="max-height: 200px; overflow-y: auto; padding-right: 4px;">
@@ -395,21 +389,25 @@ export const driversController = makePage({
         </div>
       </div>`;
   },
-  
-  createFn: () => models.driver.create({
-    name: gv("f0"), 
-    phone: gv("f1"), 
-    email: gv("f2"), 
-    password_hash: gv("f3") || "placeholder", 
-    id_device_driver: gv("f5") || null, 
-    license_no: gv("f6"), // <--- Saving the license number
-    count_trips_daily: 0
-  }),
+
+  createFn: async () => {
+    const pw = gv("f3");
+    if (!pw) throw new Error("Password is required");
+    return models.driver.create({
+      name: gv("f0"),
+      phone: gv("f1"),
+      email: gv("f2"),
+      password_hash: await sha256(pw),
+      id_device_driver: gv("f5") || null,
+      license_no: gv("f6"),
+      count_trips_daily: 0
+    });
+  },
   updateFn: id => models.driver.update(id, {
-    name: gv("f0"), 
-    phone: gv("f1"), 
+    name: gv("f0"),
+    phone: gv("f1"),
     email: gv("f2"),
-    license_no: gv("f6") // <--- Updating the license number
+    license_no: gv("f6")
   }),
   deleteLabel: d => d?.name ?? `Driver #${d?.driver_id}`,
 });
