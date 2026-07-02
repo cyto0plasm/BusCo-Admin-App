@@ -10,15 +10,18 @@
  *     • Verifies the hash server-side
  *     • Sets the session GUC variables (app.admin_role, app.admin_id)
  *     • Returns a safe JSON object — password_hash is NEVER in the response
- *  3. The returned data is stored in _session (memory only)
+ *  3. The returned data is stored in _session (memory) AND mirrored to
+ *     sessionStorage so a page refresh can restore it without re-login.
  *  4. All subsequent PostgREST requests carry the session GUC so RLS
  *     policies fire correctly for the logged-in role.
  *
  * Security hardening:
  *  • Password hash is computed client-side; plaintext never leaves the browser
- *  • Session lives in module-scoped memory only (no localStorage/sessionStorage)
+ *  • Session is persisted in sessionStorage only (cleared when the tab/window
+ *    closes) — never localStorage, never the password itself
  *  • Rate limiting: 5 failed attempts → 30s lockout
- *  • Idle timeout: 60 minutes of inactivity → automatic logout
+ *  • Idle timeout: 60 minutes of inactivity → automatic logout (tracked
+ *    across refreshes via a stored "last active" timestamp)
  */
 
 import { api }             from "./utils/api.js";
@@ -26,9 +29,11 @@ import { ge, toast }       from "./utils/dom.js";
 import { initRouter }      from "./router.js";
 
 // ── Constants ──────────────────────────────────────────────────
-const MAX_ATTEMPTS = 5;
-const LOCKOUT_MS   = 30_000;        // 30 seconds
-const IDLE_TIMEOUT = 60 * 60 * 1000; // 60 minutes
+const MAX_ATTEMPTS   = 5;
+const LOCKOUT_MS     = 30_000;        // 30 seconds
+const IDLE_TIMEOUT   = 60 * 60 * 1000; // 60 minutes
+const SESSION_KEY    = "busco_admin_session";
+const LAST_ACTIVE_KEY = "busco_admin_last_active";
 
 // ── Module-private state ───────────────────────────────────────
 let _session     = null;
@@ -38,9 +43,49 @@ let _lockedUntil = 0;
 
 export function getSession() { return _session; }
 
+// ── Session persistence (sessionStorage) ───────────────────────
+function persistSession(session) {
+  try {
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
+    sessionStorage.setItem(LAST_ACTIVE_KEY, String(Date.now()));
+  } catch { /* storage unavailable — fail silently, session just won't survive refresh */ }
+}
+
+function loadPersistedSession() {
+  try {
+    const raw = sessionStorage.getItem(SESSION_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+function clearPersistedSession() {
+  try {
+    sessionStorage.removeItem(SESSION_KEY);
+    sessionStorage.removeItem(LAST_ACTIVE_KEY);
+  } catch { /* noop */ }
+}
+
+function touchLastActive() {
+  try { sessionStorage.setItem(LAST_ACTIVE_KEY, String(Date.now())); } catch { /* noop */ }
+}
+
+// Map the enum string (SUPER_ADMIN) to the lowercase form used by RLS policies.
+function roleToLower(role) {
+  const roleMap = {
+    "SUPER_ADMIN":   "super_admin",
+    "BUS_ADMIN":     "bus_admin",
+    "FINANCE_ADMIN": "finance_admin",
+  };
+  return roleMap[role] ?? (role || "").toLowerCase();
+}
+
 // ── Idle timer ─────────────────────────────────────────────────
 function resetIdleTimer() {
   clearTimeout(_idleTimer);
+  touchLastActive();
   _idleTimer = setTimeout(() => {
     if (_session) {
       toast("Session expired due to inactivity. Please sign in again.", "warning");
@@ -61,15 +106,6 @@ function stopIdleWatcher() {
     document.removeEventListener(ev, resetIdleTimer)
   );
   clearTimeout(_idleTimer);
-}
-
-// ── Password hashing ───────────────────────────────────────────
-// SHA-256 via Web Crypto — matches SHA2(password, 256) in PostgreSQL
-async function sha256(str) {
-  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(str));
-  return Array.from(new Uint8Array(buf))
-    .map(b => b.toString(16).padStart(2, "0"))
-    .join("");
 }
 
 // ── Show / hide pages ──────────────────────────────────────────
@@ -94,12 +130,40 @@ function showAppShell() {
 function performLogout() {
   _session = null;
   api.clearSession();
+  clearPersistedSession();
   stopIdleWatcher();
   showLoginPage();
 }
 
+// ── Restore session on load (survives refresh) ─────────────────
+function tryRestoreSession() {
+  const persisted = loadPersistedSession();
+  if (!persisted) return false;
+
+  // Respect idle timeout even across a refresh: if the tab was idle longer
+  // than IDLE_TIMEOUT before the refresh, don't silently restore it.
+  let lastActive = Date.now();
+  try {
+    const raw = sessionStorage.getItem(LAST_ACTIVE_KEY);
+    if (raw) lastActive = parseInt(raw, 10) || Date.now();
+  } catch { /* noop */ }
+
+  if (Date.now() - lastActive > IDLE_TIMEOUT) {
+    clearPersistedSession();
+    return false;
+  }
+
+  _session = persisted;
+  api.setSession(_session.admin_id, roleToLower(_session.role));
+  showAppShell();
+  return true;
+}
+
 // ── Boot ───────────────────────────────────────────────────────
 export function initAuth() {
+  // If a valid session survived the refresh, jump straight to the app.
+  if (tryRestoreSession()) return;
+
   showLoginPage();
 
   const form  = ge("loginForm");
@@ -138,7 +202,7 @@ export function initAuth() {
 
     try {
       // 1. Hash the password in the browser
-      const hash = await sha256(password);
+      const hash = await sha256Local(password);
 
       // 2. Call the secure RPC — bypasses RLS, verifies hash, sets session GUC
       //    Returns: { admin_id, name, email, role, id_station, created_at }
@@ -154,15 +218,9 @@ export function initAuth() {
       _session  = typeof result === "string" ? JSON.parse(result) : result;
       _attempts = 0;
 
-      // Inject session role into every future API request (for RLS GUC).
-      // Map the enum string (SUPER_ADMIN) to the lowercase form used by policies.
-      const roleMap = {
-        "SUPER_ADMIN":   "super_admin",
-        "BUS_ADMIN":     "bus_admin",
-        "FINANCE_ADMIN": "finance_admin",
-      };
-      const roleLower = roleMap[_session.role] ?? (_session.role || "").toLowerCase();
+      const roleLower = roleToLower(_session.role);
       api.setSession(_session.admin_id, roleLower);
+      persistSession(_session);
 
       showAppShell();
 
@@ -193,4 +251,13 @@ export function initAuth() {
   });
 
   ge("logoutBtn")?.addEventListener("click", performLogout);
+}
+
+// ── Password hashing ───────────────────────────────────────────
+// SHA-256 via Web Crypto — matches SHA2(password, 256) in PostgreSQL
+async function sha256Local(str) {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf))
+    .map(b => b.toString(16).padStart(2, "0"))
+    .join("");
 }
