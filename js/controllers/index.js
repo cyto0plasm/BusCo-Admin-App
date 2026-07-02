@@ -672,40 +672,50 @@ const ROLES = [
 ];
 
 export const adminsController = makePage({
-  title:"Administrators", subtitle:"System admin accounts and roles",
-  model:models.admin, addLabel:"Add Admin",
-  cols:["ID","Name","Email","Role","Station","Created",""],
+  title: "Administrators",
+  subtitle: "System admin accounts and roles",
+  model: models.admin,
+  addLabel: "Add Admin",
+
+  cols: ["ID", "Name", "Email", "Role", "Created", ""],
+
   rowFn: a => `<tr>
     <td>${fmtId(a.admin_id)}</td>
     <td class="name-cell">${a.name ?? "—"}</td>
     <td class="sm">${a.email ?? "—"}</td>
     <td>${badge(a.role)}</td>
-    <td>${a.id_station ? `Station #${a.id_station}` : '<span class="nil">—</span>'}</td>
     <td class="ts">${fmtDate(a.created_at)}</td>
     ${actTd(a.admin_id)}
   </tr>`,
-  createFormFn: () => `
-    ${formField({id:"f0",label:"Full Name",placeholder:"Admin Name",required:true})}
-    ${formField({id:"f1",label:"Email",type:"email",placeholder:"admin@busco.eg",required:true})}
-    ${formField({id:"f2",label:"Password",type:"password",required:true})}
-    ${formField({id:"f3",label:"Role",options:ROLES,value:"BUS_ADMIN"})}
-    ${formField({id:"f4",label:"Station ID",type:"number",placeholder:"(optional)"})}`,
-  editFormFn: a => `
-    ${formField({id:"f0",label:"Full Name",value:a.name,required:true})}
-    ${formField({id:"f1",label:"Email",type:"email",value:a.email})}
-    ${formField({id:"f3",label:"Role",options:ROLES,value:a.role})}
-    ${formField({id:"f4",label:"Station ID",type:"number",value:a.id_station??''})}`,
- createFn: async () => {
-  const password = gv("f2");
 
-  return models.admin.create({
-    name: gv("f0"),
-    email: gv("f1"),
-    password_hash: await sha256(password),
-    role: gv("f3"),
-    id_station: parseInt(gv("f4")) || null
-  });
-},
-  updateFn: id => models.admin.update(id,{name:gv("f0"),email:gv("f1"),role:gv("f3"),id_station:parseInt(gv("f4"))||null}),
+  createFormFn: () => `
+    ${formField({ id: "f0", label: "Full Name", placeholder: "Admin Name", required: true })}
+    ${formField({ id: "f1", label: "Email", type: "email", placeholder: "admin@busco.eg", required: true })}
+    ${formField({ id: "f2", label: "Password", type: "password", required: true })}
+    ${formField({ id: "f3", label: "Role", options: ROLES, value: "BUS_ADMIN" })}`,
+
+  editFormFn: a => `
+    ${formField({ id: "f0", label: "Full Name", value: a.name, required: true })}
+    ${formField({ id: "f1", label: "Email", type: "email", value: a.email })}
+    ${formField({ id: "f3", label: "Role", options: ROLES, value: a.role })}`,
+
+  createFn: async () => {
+    const password = gv("f2");
+
+    return models.admin.create({
+      name: gv("f0"),
+      email: gv("f1"),
+      password_hash: await sha256(password),
+      role: gv("f3"),
+    });
+  },
+
+  updateFn: id =>
+    models.admin.update(id, {
+      name: gv("f0"),
+      email: gv("f1"),
+      role: gv("f3"),
+    }),
+
   deleteLabel: a => a?.name ?? `Admin #${a?.admin_id}`,
 });
